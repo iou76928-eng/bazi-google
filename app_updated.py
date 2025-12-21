@@ -2,36 +2,29 @@ from flask import Flask, request, render_template_string
 import traceback
 import os
 from datetime import datetime, timedelta
+
+# ==========================================
+# ✅ 修正重點：直接引入 bazi.py
+# (必須確認您的檔案已經改名為 bazi.py)
+# ==========================================
+import bazi as bazi_py  
+
+# 取得算命核心函式
+calc_bazi_8char = bazi_py.calc_bazi_8char
+
+# 引入分析邏輯 (確保這隻檔案裡沒有 tkinter)
+from bazi_calc_v2 import WebBaziAnalyzer, ZHI
+
 try:
     from zoneinfo import ZoneInfo  # Py3.9+
 except Exception:
     ZoneInfo = None  # type: ignore
 
-# ✅ 改用「bazi.py」本地運算，不再走爬蟲
-#    兼容中文檔名：優先正常 import，失敗則用 importlib 動態載入
-
-    import bazi as bazi_py
-    from pathlib import Path
-    _bazi_path = Path(__file__).with_name("bazi.py")
-    _spec = importlib.util.spec_from_file_location("bazi_py", _bazi_path)
-    if _spec is None or _spec.loader is None:
-        raise ImportError(f"無法載入bazi.py：{_bazi_path}")
-    bazi_py = importlib.util.module_from_spec(_spec)
-    _spec.loader.exec_module(bazi_py)  # type: ignore
-
-calc_bazi_8char = bazi_py.calc_bazi_8char
-
-from bazi_calc_v2 import WebBaziAnalyzer, ZHI
-
 app = Flask(__name__)
 
 
 def now_in_taipei() -> datetime:
-    """Return a 'now' datetime in Asia/Taipei.
-
-    Render (or other minimal containers) might lack IANA tzdata. We try ZoneInfo
-    first and fall back to UTC+8.
-    """
+    """Return a 'now' datetime in Asia/Taipei."""
     if ZoneInfo is not None:
         try:
             return datetime.now(ZoneInfo("Asia/Taipei"))
