@@ -10,7 +10,7 @@ except Exception:
 # ✅ 改用「bazi.py」本地運算，不再走爬蟲
 #    兼容中文檔名：優先正常 import，失敗則用 importlib 動態載入
 try:
-    import 八字 as bazi_py  # type: ignore
+    import bazi as bazi_py  # type: ignore
 except Exception:
     import importlib.util
     from pathlib import Path
