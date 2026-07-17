@@ -1,0 +1,49 @@
+name: Universal Edge Horse Race
+
+on:
+  push:
+    branches:
+      - research/universal-edge-horse-race
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: universal-edge-horse-race
+  cancel-in-progress: true
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: research/requirements-universal-edge.txt
+      - name: Install downloader
+        run: npm install --no-save dukascopy-node
+      - name: Install Python dependencies
+        run: pip install -r research/requirements-universal-edge.txt
+      - name: Download cross-asset BID and ASK M1
+        run: node research/download_universal_bidask.js
+      - name: Run universal edge horse race
+        shell: bash
+        run: |
+          mkdir -p artifacts_universal
+          set -o pipefail
+          python research/universal_edge_horse_race.py 2>&1 | tee artifacts_universal/run.log
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-edge-horse-race-results
+          path: artifacts_universal/
+          if-no-files-found: warn
+          retention-days: 14
