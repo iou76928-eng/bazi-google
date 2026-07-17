@@ -1,0 +1,75 @@
+name: Universal Edge Horse Race
+
+on:
+  push:
+    branches:
+      - research/universal-edge-horse-race
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: universal-edge-horse-race
+  cancel-in-progress: true
+
+jobs:
+  download:
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [xauusd, eurusd, btcusd]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install downloader
+        run: npm install --no-save dukascopy-node
+      - name: Download BID and ASK M5
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: node research/download_universal_asset_m5.js
+      - name: Upload market data
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-data-${{ matrix.asset }}
+          path: data_universal/
+          if-no-files-found: error
+          retention-days: 1
+
+  backtest:
+    needs: download
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: research/requirements-universal-edge.txt
+      - name: Install Python dependencies
+        run: pip install -r research/requirements-universal-edge.txt
+      - name: Download all market data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: universal-data-*
+          path: data_universal
+          merge-multiple: true
+      - name: Run universal edge horse race
+        shell: bash
+        run: |
+          mkdir -p artifacts_universal
+          set -o pipefail
+          python research/universal_edge_horse_race_v2.py 2>&1 | tee artifacts_universal/run.log
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-edge-horse-race-results
+          path: artifacts_universal/
+          if-no-files-found: warn
+          retention-days: 14
