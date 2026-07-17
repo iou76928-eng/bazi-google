@@ -1,0 +1,81 @@
+name: US Momentum Confluence
+
+on:
+  push:
+    branches:
+      - research/us-momentum-confluence
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: us-momentum-confluence
+  cancel-in-progress: true
+
+jobs:
+  download:
+    strategy:
+      fail-fast: false
+      matrix:
+        asset:
+          - xauusd
+          - eurusd
+          - gbpusd
+          - usdjpy
+          - dollaridxusd
+          - spyususd
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install downloader
+        run: npm install --no-save dukascopy-node
+      - name: Download BID and ASK M5
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: node research/download_us_momentum_asset_m5.js
+      - name: Upload market data
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-momentum-data-${{ matrix.asset }}
+          path: data_us_momentum/
+          if-no-files-found: error
+          retention-days: 1
+
+  backtest:
+    needs: download
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: research/requirements-us-momentum.txt
+      - name: Install dependencies
+        run: pip install -r research/requirements-us-momentum.txt
+      - name: Download all market data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: us-momentum-data-*
+          path: data_us_momentum
+          merge-multiple: true
+      - name: Run confluence backtest
+        shell: bash
+        run: |
+          mkdir -p artifacts_us_momentum
+          set -o pipefail
+          python research/us_momentum_confluence_backtest.py 2>&1 | tee artifacts_us_momentum/run.log
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-momentum-confluence-results
+          path: artifacts_us_momentum/
+          if-no-files-found: warn
+          retention-days: 14
