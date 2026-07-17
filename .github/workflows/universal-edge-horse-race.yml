@@ -14,25 +14,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backtest:
+  download:
+    strategy:
+      fail-fast: false
+      matrix:
+        asset: [xauusd, eurusd, btcusd]
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install downloader
+        run: npm install --no-save dukascopy-node
+      - name: Download BID and ASK M5
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: node research/download_universal_asset_m5.js
+      - name: Upload market data
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-data-${{ matrix.asset }}
+          path: data_universal/
+          if-no-files-found: error
+          retention-days: 1
+
+  backtest:
+    needs: download
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
           cache-dependency-path: research/requirements-universal-edge.txt
-      - name: Install downloader
-        run: npm install --no-save dukascopy-node
       - name: Install Python dependencies
         run: pip install -r research/requirements-universal-edge.txt
-      - name: Download cross-asset BID and ASK M5
-        run: node research/download_universal_bidask_m5.js
+      - name: Download all market data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: universal-data-*
+          path: data_universal
+          merge-multiple: true
       - name: Run universal edge horse race
         shell: bash
         run: |
