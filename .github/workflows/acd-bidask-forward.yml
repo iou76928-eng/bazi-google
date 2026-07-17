@@ -1,0 +1,43 @@
+name: ACD BID ASK Forward
+
+on:
+  push:
+    branches:
+      - research/acd-execution-quick
+    paths:
+      - 'research/acd_bidask_forward.py'
+      - '.github/workflows/acd-bidask-forward.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'research/acd_bidask_forward.py'
+      - '.github/workflows/acd-bidask-forward.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: acd-bidask-forward
+  cancel-in-progress: true
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: research/requirements-acd-quick.txt
+      - name: Install dependencies
+        run: pip install -r research/requirements-acd-quick.txt
+      - name: Run true BID ASK forward test
+        run: python research/acd_bidask_forward.py
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: acd-bidask-forward-results
+          path: artifacts_bidask/
+          if-no-files-found: error
+          retention-days: 14
