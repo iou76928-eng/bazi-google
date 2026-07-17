@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir -p artifacts_macd
           set -o pipefail
-          python research/macd_divergence_backtest.py 2>&1 | tee artifacts_macd/run.log
+          python research/macd_divergence_backtest_v2.py 2>&1 | tee artifacts_macd/run.log
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
