@@ -1,0 +1,57 @@
+name: NY 2B BID ASK
+
+on:
+  push:
+    branches:
+      - research/acd-execution-quick
+    paths:
+      - 'research/download_xauusd_bidask.js'
+      - 'research/ny_2b_bidask_quick.py'
+      - '.github/workflows/ny-2b-bidask.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'research/download_xauusd_bidask.js'
+      - 'research/ny_2b_bidask_quick.py'
+      - '.github/workflows/ny-2b-bidask.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ny-2b-bidask
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: research/requirements-acd-quick.txt
+      - name: Install Node downloader
+        run: npm install --no-save dukascopy-node
+      - name: Install Python dependencies
+        run: pip install -r research/requirements-acd-quick.txt
+      - name: Download XAUUSD BID and ASK M1
+        run: node research/download_xauusd_bidask.js
+      - name: Run NY-open 2B test
+        shell: bash
+        run: |
+          mkdir -p artifacts_2b
+          set -o pipefail
+          python research/ny_2b_bidask_quick.py 2>&1 | tee artifacts_2b/run.log
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ny-2b-bidask-results
+          path: artifacts_2b/
+          if-no-files-found: warn
+          retention-days: 14
