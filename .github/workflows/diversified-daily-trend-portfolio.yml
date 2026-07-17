@@ -1,0 +1,102 @@
+name: Diversified Daily Trend Portfolio
+
+on:
+  push:
+    branches:
+      - research/xau-donchian-long-history
+    paths:
+      - 'research/portfolio_assets.json'
+      - 'research/download_portfolio_asset_h4.js'
+      - 'research/diversified_h4_trend_portfolio.py'
+      - 'research/diversified_daily_trend_portfolio.py'
+      - '.github/workflows/diversified-daily-trend-portfolio.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'research/portfolio_assets.json'
+      - 'research/download_portfolio_asset_h4.js'
+      - 'research/diversified_h4_trend_portfolio.py'
+      - 'research/diversified_daily_trend_portfolio.py'
+      - '.github/workflows/diversified-daily-trend-portfolio.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: diversified-daily-trend-portfolio
+  cancel-in-progress: true
+
+jobs:
+  download:
+    strategy:
+      fail-fast: false
+      matrix:
+        asset:
+          - xauusd
+          - xagusd
+          - coppercmdusd
+          - brentcmdusd
+          - lightcmdusd
+          - gascmdusd
+          - cocoacmdusd
+          - sugarcmdusd
+          - ustbondtrusd
+          - bundtreur
+          - spyususd
+          - qqqususd
+          - eurusd
+          - usdjpy
+          - btcusd
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install downloader
+        run: npm install --no-save dukascopy-node
+      - name: Download BID and ASK H4
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: node research/download_portfolio_asset_h4.js
+      - name: Upload asset data
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-portfolio-data-${{ matrix.asset }}
+          path: data_portfolio/
+          if-no-files-found: error
+          retention-days: 1
+
+  validate:
+    needs: download
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: research/requirements-xau-long.txt
+      - name: Install Python dependencies
+        run: pip install -r research/requirements-xau-long.txt
+      - name: Download all asset data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: daily-portfolio-data-*
+          path: data_portfolio
+          merge-multiple: true
+      - name: Run diversified daily trend validation
+        shell: bash
+        run: |
+          mkdir -p artifacts_daily_portfolio
+          set -o pipefail
+          python research/diversified_daily_trend_portfolio.py 2>&1 | tee artifacts_daily_portfolio/run.log
+      - name: Upload daily portfolio results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diversified-daily-trend-portfolio-results
+          path: artifacts_daily_portfolio/
+          if-no-files-found: warn
+          retention-days: 14
