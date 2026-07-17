@@ -16,7 +16,7 @@ concurrency:
 jobs:
   backtest:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,14 +31,14 @@ jobs:
         run: npm install --no-save dukascopy-node
       - name: Install Python dependencies
         run: pip install -r research/requirements-universal-edge.txt
-      - name: Download cross-asset BID and ASK M1
-        run: node research/download_universal_bidask.js
+      - name: Download cross-asset BID and ASK M5
+        run: node research/download_universal_bidask_m5.js
       - name: Run universal edge horse race
         shell: bash
         run: |
           mkdir -p artifacts_universal
           set -o pipefail
-          python research/universal_edge_horse_race.py 2>&1 | tee artifacts_universal/run.log
+          python research/universal_edge_horse_race_v2.py 2>&1 | tee artifacts_universal/run.log
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
